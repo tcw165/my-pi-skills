@@ -1,6 +1,6 @@
 ---
 name: stacked-git-workflow
-description: Manage stacked PRs and Git workflow using Graphite CLI (gt). Use for creating stacked PRs, submitting code for review, rebasing stacks, navigating branches, syncing with trunk, and dependent/stacked Git changes. Includes recommended workflow patterns.
+description: Manage changes in stacked PRs using Graphite CLI (gt). Use for pushing changes, creating stacked PRs, submitting code for review, rebasing stacks, navigating branches, syncing with trunk, and dependent/stacked Git changes. Includes recommended workflow patterns.
 ---
 
 # Stacked Git Workflow with Graphite CLI (gt)
@@ -136,14 +136,15 @@ gt merge                   # Merge PRs from trunk to current branch via Graphite
 gt get [branch]            # Sync a branch/PR from remote
 ```
 
-## Preferred Workflow Pattern
+## ⚠️ STRICT WORKFLOW - Always Follow This Flow
 
-**Three-step workflow for creating and submitting PRs:**
+**Never use raw git commands like `git commit` or `git push origin main`. Always use Graphite.**
 
-### Step 1: Stage Changes
+### Step 1: Stage Changes with Git
 ```bash
 git add <changes>
 ```
+This is the ONLY place you use raw `git` - to stage files.
 
 ### Step 2: Commit with Graphite
 **For a new PR:**
@@ -156,12 +157,23 @@ gt create -m "description of changes"
 gt modify
 ```
 
-### Step 3: Submit Stack
+### Step 3: Submit to Cloud with Graphite
 ```bash
 gt submit --stack
 ```
 
-This creates PR(s) on GitHub + Graphite dashboard with the PR URL. Changes are not in trunk (`main`) until the PR is reviewed and merged.
+This creates PR(s) on GitHub + Graphite dashboard with the PR URL. Changes are NOT in trunk (`main`) until the PR is reviewed and merged.
+
+---
+
+**Key Rules:**
+- ✅ Use `git add` to stage
+- ✅ Use `gt create` for new PRs
+- ✅ Use `gt modify` for existing PRs
+- ✅ Use `gt submit --stack` to push
+- ❌ Never use `git commit`
+- ❌ Never use `git push origin main`
+- ❌ Never use `git commit --amend`
 
 ---
 
@@ -170,18 +182,20 @@ This creates PR(s) on GitHub + Graphite dashboard with the PR URL. Changes are n
 ### Scenario 1: New Feature (Single PR)
 
 ```bash
-# Make changes
+# Step 1: Make changes
 echo "new code" >> src/feature.ts
 
-# Stage and create PR
+# Step 1: Stage changes
 git add src/feature.ts
+
+# Step 2: Create PR with Graphite (NOT git commit!)
 gt create -m "add new feature"
 
-# Submit to Graphite/GitHub
+# Step 3: Submit to cloud
 gt submit
 
 # PR URL shown in terminal — share for review
-# After approval & merge, changes appear in main
+# After approval & merge on GitHub, changes appear in main
 ```
 
 ### Scenario 2: Feature Stack (Multiple Related PRs)
@@ -190,26 +204,26 @@ gt submit
 # Start from trunk
 gt checkout main
 
-# Create PR 1: Foundation
+# PR 1: Foundation
 echo "base API" >> src/api.ts
 git add src/api.ts
 gt create -m "add base API endpoint"
 
-# Stack PR 2: Business logic on top
+# PR 2: Stack on top of PR 1
 echo "business logic" >> src/logic.ts
 git add src/logic.ts
 gt create -m "add business logic"
 
-# Stack PR 3: UI on top of PR 2
+# PR 3: Stack on top of PR 2
 echo "ui component" >> src/ui.ts
 git add src/ui.ts
 gt create -m "add UI component"
 
-# Submit entire stack
+# Step 3: Submit entire stack at once
 gt submit --stack
 
-# All three PRs created with dependency chain
-# Merge in order: PR1 → PR2 → PR3
+# All three PRs created in dependency chain
+# Review & merge in order: PR1 → PR2 → PR3
 ```
 
 ### Scenario 3: Updating an Existing PR
@@ -218,13 +232,13 @@ gt submit --stack
 # Make changes
 echo "bug fix" >> src/feature.ts
 
-# Stage changes
+# Step 1: Stage changes
 git add src/feature.ts
 
-# Update the current PR (restacks descendants)
+# Step 2: Update current PR with Graphite (NOT git commit --amend!)
 gt modify
 
-# Resubmit if needed
+# Step 3: Resubmit
 gt submit
 ```
 
@@ -249,27 +263,37 @@ gt sync
 ## Typical Full Workflow
 
 ```bash
-# 1. Start from trunk
+# Start from trunk
 gt checkout main
 
-# 2. Create first branch in the stack
+# PR 1: API foundation
+# (make changes)
+git add src/api.ts
 gt create -m "add API endpoint"
 
-# 3. Stack another change on top
+# PR 2: Frontend (stacked on PR 1)
+# (make changes)
+git add src/frontend.ts
 gt create -m "add frontend for API"
 
-# 4. Stack docs on top
+# PR 3: Documentation (stacked on PR 2)
+# (make changes)
+git add docs/api.md
 gt create -m "add API docs"
 
-# 5. Submit the whole stack as linked PRs
+# Step 3: Submit entire stack
 gt submit --stack
 
-# 6. After review feedback, go to the branch that needs changes
+# After review feedback, update the PR that needs changes
 gt checkout "add API endpoint"
-# Make changes...
+# (make changes)
+git add src/api.ts
 gt modify
 
-# 7. Sync with latest trunk and clean up
+# Resubmit the updated PR and its stack
+gt submit
+
+# After all PRs are merged on GitHub, sync trunk
 gt sync
 ```
 
@@ -278,7 +302,9 @@ gt sync
 - Always use `gt sync` before starting new work to stay up to date
 - Use `gt log` frequently to visualize your stack
 - Prefer small, focused branches — that's the whole point of stacking
-- Use `gt modify` (not `git commit --amend`) to ensure descendants are restacked
-- Use `gt submit --stack` to push everything at once
+- **Always use `gt modify` for updates** (never `git commit --amend`)
+- **Always use `gt create` for new PRs** (never `git commit`)
+- **Always use `gt submit --stack`** (never `git push origin main`)
+- Use `gt submit --stack` to push the entire stack at once
 - If a rebase conflicts, resolve and run `gt continue`
 - Use `gt undo` if something goes wrong
