@@ -1,0 +1,39 @@
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+.npm
+package-lock.json
+yarn.lock
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Build & Distribution
+dist/
+build/
+*.tsbuildinfo
+out/
+
+# Logs
+logs/
+*.log
+
+# Pi local (if needed)
+.pi/sessions/
+.pi/cache/
+
+# IDE
+*.swp
+*.swo
+*~
+.vscode/*
+!.vscode/settings.json
