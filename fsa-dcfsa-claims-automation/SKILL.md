@@ -69,6 +69,13 @@ Convert PDF credit card statements to text and load transactions into MongoDB.
      - `imported_at` (Date): ISO timestamp when transaction was imported
      - `source_file` (string): Absolute path to source PDF file
    - Create index on `imported_at` field for faster queries
+   - Schema with types for eligibility fields (populated in Step 3, default: null):
+     - `eligibility_reason` (string, nullable): Reason for eligibility determination (e.g., "FSA-eligible", "DCFSA-ineligible")
+     - `eligible_fsa` (boolean, nullable): Whether transaction is eligible for FSA reimbursement
+     - `eligible_dcfsa` (boolean, nullable): Whether transaction is eligible for DCFSA reimbursement
+     - `eligible_fsa_confidence` (number, nullable): Confidence score for FSA eligibility (0.0-1.0)
+     - `eligible_dcfsa_confidence` (number, nullable): Confidence score for DCFSA eligibility (0.0-1.0)
+     - `eligibility_scored_at` (Date, nullable): ISO timestamp when eligibility was scored
 
 **Output:** Transactions stored in MongoDB (one document per transaction), ready for eligibility scanning
 
@@ -100,19 +107,21 @@ Cross-reference transactions against eligibility rules and score them.
 **Input:** Transactions from MongoDB + eligibility rules from Qdrant
 
 **Process:**
-1. Load all transactions for the month
-2. Load cached eligibility rules
+1. **Load transactions from MongoDB:** Query collection `credit_card_statements` for all transactions in the target month (filter by `imported_at` date range)
+2. **Load eligibility rules from Qdrant:** Query Qdrant collections for FSA, DCFSA, and ineligible eligibility patterns and rules
 3. For each transaction:
-   - Extract key terms (merchant name, description)
-   - Match against FSA eligibility rules → score
-   - Match against DCFSA eligibility rules → score
-   - Match against ineligible patterns → score
-   - Determine final eligibility status
-4. Update MongoDB with eligibility results and confidence scores
-5. Identify transactions requiring manual review
-6. Generate eligibility report
+   - Extract key terms (merchant name, description, category)
+   - Match against FSA eligibility rules → compute `eligible_fsa_confidence` score
+   - Match against DCFSA eligibility rules → compute `eligible_dcfsa_confidence` score
+   - Determine final eligibility status and set `eligible_fsa` and `eligible_dcfsa` booleans
+   - Set `eligibility_reason` (human-readable summary)
+4. **Update MongoDB with eligibility results:** Populate eligibility schema fields for each transaction:
+   - `eligible_fsa`, `eligible_dcfsa`, `eligibility_reason`
+   - `eligible_fsa_confidence`, `eligible_dcfsa_confidence`
+   - `eligibility_scored_at` (current timestamp)
+5. Generate eligibility report (summary of results by category and status)
 
-**Output:** Updated transactions with eligibility status, manual review list, summary report
+**Output:** Updated transactions in MongoDB with populated eligibility fields, summary report
 
 ---
 
