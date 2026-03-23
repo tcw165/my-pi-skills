@@ -1,0 +1,176 @@
+#!/usr/bin/env tsx
+/**
+ * ingest-transaction-cli.ts
+ *
+ * CLI for inserting, upserting, and deleting CreditCardTransaction documents.
+ *
+ * Usage:
+ *   npx tsx ingest-transaction-cli.ts --insert-transaction '<json>'
+ *   npx tsx ingest-transaction-cli.ts --upsert-transaction '<json>'
+ *   npx tsx ingest-transaction-cli.ts --delete-transaction <id>
+ *   npx tsx ingest-transaction-cli.ts --drop-table
+ *
+ * --insert-transaction
+ *   JSON matching NewTransactionInput (all core fields required, eligibility
+ *   fields are set to null automatically).
+ *   Example:
+ *     '{"date":"2025-02-14","merchant":"WALGREENS","amount":12.5,
+ *       "description":"Pharmacy","category":"pharmacy","issuer":"Chase",
+ *       "card_last_four":"4242","imported_at":"2025-02-15T10:00:00Z",
+ *       "source_file":"/tmp/stmt.pdf"}'
+ *
+ * --upsert-transaction
+ *   JSON with a required "id" field plus any subset of transaction fields.
+ *   Updates the matching document with the provided fields ($set).
+ *   If no document with that id exists, inserts one (MongoDB upsert).
+ *   "id" is mapped to MongoDB's internal "_id" field automatically.
+ *   Example (partial update):
+ *     '{"id":"507f1f77bcf86cd799439011","merchant":"WALGREENS #2"}'
+ *
+ * --delete-transaction <id>
+ *   Deletes the document with the given MongoDB ObjectId string.
+ *
+ * --drop-table
+ *   Drops the entire credit_card_statements collection. Irreversible.
+ *
+ * --setup-db
+ *   Creates the credit_card_statements collection with JSON Schema validation
+ *   and all required indexes. Safe to re-run (idempotent).
+ *
+ * --transaction-schema
+ *   Prints the full JSON Schema for CreditCardTransaction and exits.
+ *   No database connection required.
+ */
+
+import { Command } from "commander";
+import { MongoClient } from "mongodb";
+import chalk from "chalk";
+import { MONGO_URI, DB_NAME, COLLECTION_NAME } from "./consts.js";
+import {
+  insertTransaction,
+  upsertTransaction,
+  deleteTransaction,
+  dropCollectionIfExists,
+  COLLECTION_OPTIONS,
+  INDEXES,
+} from "./ingest-transaction-core.js";
+
+// ---------------------------------------------------------------------------
+// Logging helpers
+// ---------------------------------------------------------------------------
+
+function ok(msg: string) {
+  console.log(chalk.green("  [ok]"), msg);
+}
+function warn(msg: string) {
+  console.log(chalk.yellow("[warn]"), msg);
+}
+
+// ---------------------------------------------------------------------------
+// CLI
+// ---------------------------------------------------------------------------
+
+if (require.main === module) {
+  const program = new Command()
+    .name("ingest-transaction-cli")
+    .description("Insert, upsert, or delete a CreditCardTransaction in MongoDB.")
+    .option(
+      "--insert-transaction <json>",
+      "Insert a new transaction (JSON matching NewTransactionInput)",
+    )
+    .option(
+      "--upsert-transaction <json>",
+      'Upsert a transaction (JSON with required "id" + partial fields)',
+    )
+    .option("--delete-transaction <id>", "Delete a transaction by MongoDB ObjectId")
+    .option("--drop-table", "Drop the entire credit_card_statements collection")
+    .option("--transaction-schema", "Print the CreditCardTransaction JSON Schema and exit");
+
+  program.parse(process.argv);
+  const opts = program.opts<{
+    insertTransaction?: string;
+    upsertTransaction?: string;
+    deleteTransaction?: string;
+    dropTable?: boolean;
+    setupDb?: boolean;
+    transactionSchema?: boolean;
+  }>();
+
+  // --transaction-schema needs no DB connection — handle and exit immediately.
+  if (opts.transactionSchema) {
+    console.log(JSON.stringify(COLLECTION_OPTIONS.validator!.$jsonSchema, null, 2));
+    process.exit(0);
+  }
+
+  const provided = [
+    opts.insertTransaction,
+    opts.upsertTransaction,
+    opts.deleteTransaction,
+    opts.dropTable,
+    opts.setupDb,
+  ].filter(Boolean);
+
+  if (provided.length !== 1) {
+    program.help();
+  }
+
+  async function main() {
+    const client = new MongoClient(MONGO_URI);
+
+    try {
+      await client.connect();
+      const db = client.db(DB_NAME);
+
+      // -- insert --------------------------------------------------------------
+      if (opts.insertTransaction !== undefined) {
+        const result = await insertTransaction(db, JSON.parse(opts.insertTransaction));
+        ok(`Inserted: ${result._id.toString()}`);
+      }
+
+      // -- upsert --------------------------------------------------------------
+      if (opts.upsertTransaction !== undefined) {
+        const raw = JSON.parse(opts.upsertTransaction) as Record<string, unknown>;
+        const { id, ...fields } = raw;
+
+        if (id === undefined) {
+          console.error(chalk.red("[error]"), '--upsert-transaction requires an "id" field');
+          process.exit(1);
+        }
+
+        const result = await upsertTransaction(db, id as string, fields);
+        if (result.upsertedId) {
+          ok(`Upserted (new): ${result.upsertedId}`);
+        } else {
+          ok(`Updated: ${id as string}  (${result.modifiedCount} field(s) changed)`);
+        }
+      }
+
+      // -- delete --------------------------------------------------------------
+      if (opts.deleteTransaction !== undefined) {
+        const deleted = await deleteTransaction(db, opts.deleteTransaction);
+        if (deleted) {
+          ok(`Deleted: ${opts.deleteTransaction}`);
+        } else {
+          warn(`No document found with id: ${opts.deleteTransaction}`);
+        }
+      }
+
+      // -- drop-table ----------------------------------------------------------
+      if (opts.dropTable) {
+        const dropped = await dropCollectionIfExists(db, COLLECTION_NAME);
+        if (dropped) {
+          ok(`Dropped collection: ${COLLECTION_NAME}`);
+        } else {
+          warn(`Collection ${COLLECTION_NAME} does not exist — nothing to drop`);
+        }
+      }
+    } finally {
+      await client.close();
+    }
+  }
+
+  main().catch((err) => {
+    console.error(chalk.red("[error]"), err instanceof Error ? err.message : err);
+    process.exit(1);
+  });
+}

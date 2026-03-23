@@ -35,6 +35,15 @@ brew install poppler
 apt-get install poppler-utils
 ```
 
+## Setup
+
+Run once before first use:
+
+```bash
+cd {baseDir}/fsa-dcfsa-claims-automation/scripts
+npm install
+```
+
 ---
 
 ## Workflow Steps
@@ -56,26 +65,24 @@ Convert PDF credit card statements to text and load transactions into MongoDB.
 4. Convert each PDF to text using the PDF-to-text skill
 5. Extract transaction data from text (date, merchant, amount, description)
 6. Normalize merchant names and assign transaction categories
-7. Store in MongoDB: database `fsa_claims_db`, collection `credit_card_statements`
-   - Each document represents a single transaction
-   - Schema with types:
-     - `date` (string): Transaction date in YYYY-MM-DD format
-     - `merchant` (string): Normalized merchant name (uppercase)
-     - `amount` (number): Transaction amount (positive for charges, negative for credits)
-     - `description` (string): Human-readable transaction description
-     - `category` (string): Transaction category (e.g., food, medical, pharmacy, gas, etc.)
-     - `issuer` (string): Credit card issuer name
-     - `card_last_four` (string): Last 4 digits of card number
-     - `imported_at` (Date): ISO timestamp when transaction was imported
-     - `source_file` (string): Absolute path to source PDF file
-   - Create index on `imported_at` field for faster queries
-   - Schema with types for eligibility fields (populated in Step 3, default: null):
-     - `eligibility_reason` (string, nullable): Reason for eligibility determination (e.g., "FSA-eligible", "DCFSA-ineligible")
-     - `eligible_fsa` (boolean, nullable): Whether transaction is eligible for FSA reimbursement
-     - `eligible_dcfsa` (boolean, nullable): Whether transaction is eligible for DCFSA reimbursement
-     - `eligible_fsa_confidence` (number, nullable): Confidence score for FSA eligibility (0.0-1.0)
-     - `eligible_dcfsa_confidence` (number, nullable): Confidence score for DCFSA eligibility (0.0-1.0)
-     - `eligibility_scored_at` (Date, nullable): ISO timestamp when eligibility was scored
+7. Store each transaction in MongoDB using the ingestion CLI:
+
+   ```bash
+   cd {baseDir}/fsa-dcfsa-claims-automation/scripts
+   npx tsx ingest-transaction-cli.ts --insert-transaction '<json>'
+   ```
+
+   To see the full field schema before inserting, run:
+   ```bash
+   npx tsx ingest-transaction-cli.ts --transaction-schema
+   ```
+
+   Eligibility fields (`eligible_fsa`, `eligible_dcfsa`, etc.) are set to `null` automatically and populated in Step 3.
+
+   To correct a previously inserted transaction, use `--upsert-transaction` with the document's `id`:
+   ```bash
+   npx tsx ingest-transaction-cli.ts --upsert-transaction '{"id":"<id>","amount":99.99}'
+   ```
 
 **Output:** Transactions stored in MongoDB (one document per transaction), ready for eligibility scanning
 
