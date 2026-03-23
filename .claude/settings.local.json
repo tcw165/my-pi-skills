@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls /Users/boyw165/.pi/agent/skills/my-pi-skills/fsa-dcfsa-claims-automation/scripts/node_modules/mongodb/package.json | head -1 && node -e \"const p = require\\('/Users/boyw165/.pi/agent/skills/my-pi-skills/fsa-dcfsa-claims-automation/scripts/node_modules/mongodb/package.json'\\); console.log\\(p.version\\)\")",
+      "Bash(node -e \"const p = require\\('/Users/boyw165/.pi/agent/skills/my-pi-skills/fsa-dcfsa-claims-automation/scripts/node_modules/tsx/package.json'\\); console.log\\('tsx', p.version\\)\")",
+      "Bash(npm info:*)",
+      "Bash(node -e \"\n// Simulate what tsx does: it compiles TS on the fly and runs it via Node CJS loader.\n// Check what require.main === module evaluates to in tsx context.\n// tsx uses Node's CJS module system when module=CommonJS, so require.main works.\nconsole.log\\('Node CJS require.main check is valid with tsx + module:CommonJS'\\);\n\")",
+      "Bash(cd /Users/boyw165/.pi/agent/skills/my-pi-skills/fsa-dcfsa-claims-automation/scripts && npm install 2>&1 | tail -5)",
+      "Bash(npx vitest:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(npx tsx:*)"
+    ]
+  }
+}
