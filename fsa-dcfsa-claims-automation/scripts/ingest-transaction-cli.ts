@@ -122,7 +122,7 @@ if (require.main === module) {
     process.exit(0);
   }
   if (opts.querySchema) {
-    console.log(toYaml(QUERY_SCHEMA));
+    console.log(toYaml(QUERY_SCHEMA.$jsonSchema));
     process.exit(0);
   }
 

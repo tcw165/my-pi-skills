@@ -297,25 +297,36 @@ export async function deleteTransaction(db: Db, id: string): Promise<boolean> {
 // Query
 // ---------------------------------------------------------------------------
 
-export interface TransactionQuery {
-  date_from?: string;
-  date_to?: string;
-  card_last_four?: string;
-  merchant?: string;
-  eligible_fsa?: boolean;
-  eligible_dcfsa?: boolean;
-  limit?: number;
-}
+// Single source of truth for query field metadata.
+// TransactionQuery and QUERY_SCHEMA are both derived from this.
+const QUERY_PROPERTIES = {
+  date_from:      { bsonType: "string" as const, description: "Return transactions with date >= this value (YYYY-MM-DD)" },
+  date_to:        { bsonType: "string" as const, description: "Return transactions with date <= this value (YYYY-MM-DD)" },
+  card_last_four: { bsonType: "string" as const, description: "Filter by last 4 digits of card" },
+  merchant:       { bsonType: "string" as const, description: "Filter by merchant name (exact match, uppercase)" },
+  eligible_fsa:   { bsonType: "bool"   as const, description: "Filter by FSA eligibility (true/false); omit to return all" },
+  eligible_dcfsa: { bsonType: "bool"   as const, description: "Filter by DCFSA eligibility (true/false); omit to return all" },
+  limit:          { bsonType: "int"    as const, description: "Max results to return (default: 100, max: 100)" },
+};
 
-/** Human-readable description of each query field. Printed by --query-schema. */
-export const QUERY_SCHEMA: Record<keyof TransactionQuery, { type: string; description: string }> = {
-  date_from:      { type: "string",  description: "Return transactions with date >= this value (YYYY-MM-DD)" },
-  date_to:        { type: "string",  description: "Return transactions with date <= this value (YYYY-MM-DD)" },
-  card_last_four: { type: "string",  description: "Filter by last 4 digits of card" },
-  merchant:       { type: "string",  description: "Filter by merchant name (exact match, uppercase)" },
-  eligible_fsa:   { type: "boolean", description: "Filter by FSA eligibility (true/false); omit to return all" },
-  eligible_dcfsa: { type: "boolean", description: "Filter by DCFSA eligibility (true/false); omit to return all" },
-  limit:          { type: "number",  description: "Max results to return (default: 100, max: 100)" },
+type BsonToTs<T extends string> =
+  T extends "string" ? string :
+  T extends "bool"   ? boolean :
+  T extends "int"    ? number :
+  never;
+
+export type TransactionQuery = {
+  [K in keyof typeof QUERY_PROPERTIES]?: BsonToTs<(typeof QUERY_PROPERTIES)[K]["bsonType"]>;
+};
+
+/** JSON Schema description of query parameters. Printed by --query-schema. */
+export const QUERY_SCHEMA = {
+  $jsonSchema: {
+    bsonType: "object",
+    title: "TransactionQuery",
+    properties: QUERY_PROPERTIES,
+    additionalProperties: false,
+  },
 };
 
 export async function queryTransactions(
