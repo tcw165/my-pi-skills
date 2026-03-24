@@ -1,4 +1,4 @@
-import { type Db, type CreateCollectionOptions, type WithId, ObjectId, Double } from "mongodb";
+import { type Db, type CreateCollectionOptions, type WithId, type Filter, ObjectId, Double } from "mongodb";
 import { CreditCardTransaction, type NewTransactionInput } from "./models.js";
 import { COLLECTION_NAME } from "./consts.js";
 
@@ -291,4 +291,51 @@ export async function deleteTransaction(db: Db, id: string): Promise<boolean> {
       _id: new ObjectId(id as string),
     });
   return result.deletedCount > 0;
+}
+
+// ---------------------------------------------------------------------------
+// Query
+// ---------------------------------------------------------------------------
+
+export interface TransactionQuery {
+  date_from?: string;
+  date_to?: string;
+  card_last_four?: string;
+  merchant?: string;
+  eligible_fsa?: boolean;
+  eligible_dcfsa?: boolean;
+  limit?: number;
+}
+
+/** Human-readable description of each query field. Printed by --query-schema. */
+export const QUERY_SCHEMA: Record<keyof TransactionQuery, { type: string; description: string }> = {
+  date_from:      { type: "string",  description: "Return transactions with date >= this value (YYYY-MM-DD)" },
+  date_to:        { type: "string",  description: "Return transactions with date <= this value (YYYY-MM-DD)" },
+  card_last_four: { type: "string",  description: "Filter by last 4 digits of card" },
+  merchant:       { type: "string",  description: "Filter by merchant name (exact match, uppercase)" },
+  eligible_fsa:   { type: "boolean", description: "Filter by FSA eligibility (true/false); omit to return all" },
+  eligible_dcfsa: { type: "boolean", description: "Filter by DCFSA eligibility (true/false); omit to return all" },
+  limit:          { type: "number",  description: "Max results to return (default: 100, max: 100)" },
+};
+
+export async function queryTransactions(
+  db: Db,
+  query: TransactionQuery,
+): Promise<WithId<CreditCardTransaction>[]> {
+  const filter: Filter<CreditCardTransaction> = {};
+
+  if (query.date_from || query.date_to) {
+    filter.date = {
+      ...(query.date_from ? { $gte: query.date_from } : {}),
+      ...(query.date_to   ? { $lte: query.date_to   } : {}),
+    } as Filter<string>;
+  }
+  if (query.card_last_four !== undefined) filter.card_last_four = query.card_last_four;
+  if (query.merchant       !== undefined) filter.merchant       = query.merchant;
+  if (query.eligible_fsa   !== undefined) filter.eligible_fsa   = query.eligible_fsa;
+  if (query.eligible_dcfsa !== undefined) filter.eligible_dcfsa = query.eligible_dcfsa;
+
+  const limit = Math.min(query.limit ?? 100, 100);
+
+  return CreditCardTransaction.collection(db).find(filter).limit(limit).toArray();
 }
