@@ -62,11 +62,8 @@ import {
   upsertTransaction,
   deleteTransaction,
   dropCollectionIfExists,
-  ensureCollection,
-  ensureIndexes,
   queryTransactions,
   COLLECTION_OPTIONS,
-  INDEXES,
   QUERY_SCHEMA,
   type TransactionQuery,
 } from "./ingest-transaction-core.js";

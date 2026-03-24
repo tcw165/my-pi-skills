@@ -114,7 +114,18 @@ Cross-reference transactions against eligibility rules and score them.
 **Input:** Transactions from MongoDB + eligibility rules from Qdrant
 
 **Process:**
-1. **Load transactions from MongoDB:** Query collection `credit_card_statements` for all transactions in the target month (filter by `imported_at` date range)
+1. **Load transactions from MongoDB:** Query transactions for the target month using the CLI:
+
+   ```bash
+   cd {baseDir}/fsa-dcfsa-claims-automation/scripts
+   npx tsx ingest-transaction-cli.ts --query-transaction '{"date_from":"2025-02-01","date_to":"2025-02-28"}'
+   ```
+
+   To see all available query parameters:
+   ```bash
+   npx tsx ingest-transaction-cli.ts --query-schema
+   ```
+
 2. **Load eligibility rules from Qdrant:** Query Qdrant collections for FSA, DCFSA, and ineligible eligibility patterns and rules
 3. For each transaction:
    - Extract key terms (merchant name, description, category)
@@ -122,10 +133,11 @@ Cross-reference transactions against eligibility rules and score them.
    - Match against DCFSA eligibility rules → compute `eligible_dcfsa_confidence` score
    - Determine final eligibility status and set `eligible_fsa` and `eligible_dcfsa` booleans
    - Set `eligibility_reason` (human-readable summary)
-4. **Update MongoDB with eligibility results:** Populate eligibility schema fields for each transaction:
-   - `eligible_fsa`, `eligible_dcfsa`, `eligibility_reason`
-   - `eligible_fsa_confidence`, `eligible_dcfsa_confidence`
-   - `eligibility_scored_at` (current timestamp)
+4. **Update MongoDB with eligibility results** using `--upsert-transaction` for each transaction:
+   ```bash
+   npx tsx ingest-transaction-cli.ts --upsert-transaction \
+     '{"id":"<id>","eligible_fsa":true,"eligible_dcfsa":false,"eligible_fsa_confidence":0.95,"eligible_dcfsa_confidence":0.1,"eligibility_reason":"Pharmacy purchase","eligibility_scored_at":"2025-03-01T00:00:00Z"}'
+   ```
 5. Generate eligibility report (summary of results by category and status)
 
 **Output:** Updated transactions in MongoDB with populated eligibility fields, summary report
