@@ -40,10 +40,21 @@
  * --transaction-schema
  *   Prints the full JSON Schema for CreditCardTransaction and exits.
  *   No database connection required.
+ *
+ * --query-transaction <json>
+ *   Query transactions. All fields optional and combinable.
+ *   Run --query-schema to see available fields.
+ *   Example:
+ *     '{"date_from":"2025-02-01","date_to":"2025-02-28","eligible_fsa":true}'
+ *
+ * --query-schema
+ *   Prints available query parameters for --query-transaction and exits.
+ *   No database connection required.
  */
 
 import { Command } from "commander";
 import { MongoClient } from "mongodb";
+import { stringify as toYaml } from "yaml";
 import chalk from "chalk";
 import { MONGO_URI, DB_NAME, COLLECTION_NAME } from "./consts.js";
 import {
@@ -51,8 +62,13 @@ import {
   upsertTransaction,
   deleteTransaction,
   dropCollectionIfExists,
+  ensureCollection,
+  ensureIndexes,
+  queryTransactions,
   COLLECTION_OPTIONS,
   INDEXES,
+  QUERY_SCHEMA,
+  type TransactionQuery,
 } from "./ingest-transaction-core.js";
 
 // ---------------------------------------------------------------------------
@@ -84,7 +100,9 @@ if (require.main === module) {
     )
     .option("--delete-transaction <id>", "Delete a transaction by MongoDB ObjectId")
     .option("--drop-table", "Drop the entire credit_card_statements collection")
-    .option("--transaction-schema", "Print the CreditCardTransaction JSON Schema and exit");
+    .option("--transaction-schema", "Print the CreditCardTransaction JSON Schema and exit")
+    .option("--query-transaction <json>", "Query transactions (see --query-schema for fields)")
+    .option("--query-schema", "Print available query parameters for --query-transaction and exit");
 
   program.parse(process.argv);
   const opts = program.opts<{
@@ -94,11 +112,17 @@ if (require.main === module) {
     dropTable?: boolean;
     setupDb?: boolean;
     transactionSchema?: boolean;
+    queryTransaction?: string;
+    querySchema?: boolean;
   }>();
 
-  // --transaction-schema needs no DB connection — handle and exit immediately.
+  // Schema flags need no DB connection — handle and exit immediately.
   if (opts.transactionSchema) {
-    console.log(JSON.stringify(COLLECTION_OPTIONS.validator!.$jsonSchema, null, 2));
+    console.log(toYaml(COLLECTION_OPTIONS.validator!.$jsonSchema));
+    process.exit(0);
+  }
+  if (opts.querySchema) {
+    console.log(toYaml(QUERY_SCHEMA));
     process.exit(0);
   }
 
@@ -108,6 +132,7 @@ if (require.main === module) {
     opts.deleteTransaction,
     opts.dropTable,
     opts.setupDb,
+    opts.queryTransaction,
   ].filter(Boolean);
 
   if (provided.length !== 1) {
@@ -152,6 +177,35 @@ if (require.main === module) {
           ok(`Deleted: ${opts.deleteTransaction}`);
         } else {
           warn(`No document found with id: ${opts.deleteTransaction}`);
+        }
+      }
+
+      // -- query-transaction ---------------------------------------------------
+      if (opts.queryTransaction !== undefined) {
+        const query = JSON.parse(opts.queryTransaction) as TransactionQuery;
+        const results = await queryTransactions(db, query);
+        if (results.length === 0) {
+          warn("No transactions matched the query.");
+        } else {
+          const plain = results.map((doc) => ({
+            id: doc._id.toString(),
+            date: doc.date,
+            merchant: doc.merchant,
+            amount: doc.amount,
+            description: doc.description,
+            category: doc.category,
+            issuer: doc.issuer,
+            card_last_four: doc.card_last_four,
+            imported_at: doc.imported_at.toISOString(),
+            source_file: doc.source_file,
+            eligible_fsa: doc.eligible_fsa,
+            eligible_dcfsa: doc.eligible_dcfsa,
+            eligible_fsa_confidence: doc.eligible_fsa_confidence,
+            eligible_dcfsa_confidence: doc.eligible_dcfsa_confidence,
+            eligibility_reason: doc.eligibility_reason,
+            eligibility_scored_at: doc.eligibility_scored_at?.toISOString() ?? null,
+          }));
+          process.stdout.write(toYaml(plain));
         }
       }
 
