@@ -145,8 +145,12 @@ if (require.main === module) {
 
       // -- insert --------------------------------------------------------------
       if (opts.insertTransaction !== undefined) {
-        const result = await insertTransaction(db, JSON.parse(opts.insertTransaction));
-        ok(`Inserted: ${result._id.toString()}`);
+        const { doc, inserted } = await insertTransaction(db, JSON.parse(opts.insertTransaction));
+        if (inserted) {
+          ok(`Inserted: ${doc._id.toString()}`);
+        } else {
+          warn(`Duplicate skipped: ${doc._id.toString()}`);
+        }
       }
 
       // -- upsert --------------------------------------------------------------
