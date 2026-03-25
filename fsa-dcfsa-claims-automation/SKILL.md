@@ -44,6 +44,8 @@ cd {baseDir}/fsa-dcfsa-claims-automation/scripts
 npm install
 ```
 
+⚠️ **Important:** No new scripts should be created in the `scripts/` folder during the workflow. Use only the existing CLI tools: `ingest-transaction-cli.ts` and `score-transactions.ts`. All workflow steps must use these existing scripts and tools.
+
 ---
 
 ## Workflow Steps
