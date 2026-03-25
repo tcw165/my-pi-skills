@@ -247,13 +247,32 @@ function coerceAmount(obj: Record<string, unknown>): void {
   }
 }
 
+const DEDUP_FIELDS = ["date", "merchant", "amount", "description", "issuer", "card_last_four"] as const;
+
+export interface InsertTransactionResult {
+  doc: WithId<CreditCardTransaction>;
+  inserted: boolean;
+}
+
 export async function insertTransaction(
   db: Db,
   raw: Record<string, unknown>,
-): Promise<WithId<CreditCardTransaction>> {
+): Promise<InsertTransactionResult> {
   await setupDb(db);
   coerceDates(raw);
-  return CreditCardTransaction.insert(db, raw as NewTransactionInput);
+  coerceAmount(raw);
+
+  const filter = Object.fromEntries(
+    DEDUP_FIELDS.map((f) => [f, raw[f]]),
+  ) as Filter<CreditCardTransaction>;
+
+  const existing = await CreditCardTransaction.collection(db).findOne(filter);
+  if (existing) {
+    return { doc: existing, inserted: false };
+  }
+
+  const doc = await CreditCardTransaction.insert(db, raw as NewTransactionInput);
+  return { doc, inserted: true };
 }
 
 export interface UpsertTransactionResult {
