@@ -11,9 +11,53 @@ Semantic search pipeline: generate embeddings from text queries using Ollama, th
 
 - **Ollama** on `http://localhost:11434`
 - **Qdrant** on `http://localhost:6333`
-- Running: `docker-compose up -d ollama qdrant`
+- **Node.js** (for `qdrant-cli`)
 
-## Steps
+```bash
+cd {baseDir} && docker-compose up -d ollama qdrant
+```
+
+## Setup
+
+Run once before first use:
+
+```bash
+cd {baseDir}/vector-search/scripts
+npm install
+```
+
+## `qdrant-cli` — scriptable search
+
+`scripts/qdrant-cli` is an executable that wraps `npx tsx qdrant-cli.ts`. It handles embedding generation and Qdrant querying in one command, with stdout output designed for piping.
+
+```bash
+cd {baseDir}/vector-search/scripts
+
+# Basic search
+./qdrant-cli --search "FSA eligible pharmacy items"
+
+# Different collection or result count
+./qdrant-cli --search "DCFSA childcare" --collection forma_help_center --limit 20
+
+# Save to file
+./qdrant-cli --search "FSA DCFSA eligibility rules" > /tmp/rules.txt
+
+# Pipe directly into another script
+./qdrant-cli --search "FSA DCFSA eligibility" | npx tsx ../../fsa-dcfsa-claims-automation/scripts/score-transactions.ts --dry-run
+```
+
+Flags:
+- `--search <query>` (required) — search query text
+- `--collection <name>` (default: `forma_help_center`)
+- `--limit <n>` (default: 10)
+
+Env vars:
+- `OLLAMA_URL` (default: `http://localhost:11434`)
+- `QDRANT_URL` (default: `http://localhost:6333`)
+
+---
+
+## Manual Steps
 
 1. **Create unique session ID** - Generates a nanosecond-based session identifier for this search workflow, ensuring isolated temp files for concurrent operations.
 
@@ -96,7 +140,7 @@ done
 
 **Connection refused on Ollama:**
 ```bash
-docker-compose ps ollama
+cd {baseDir} && docker-compose ps ollama
 docker-compose up -d ollama
 ```
 
