@@ -74,8 +74,7 @@ choco install mongodb-database-tools
 docker-compose ps | grep mongodb
 
 # Start if not running
-cd /Users/boyw165/Projects/my-pi-extension
-docker-compose up -d mongodb
+cd {baseDir} && docker-compose up -d mongodb
 
 # View logs
 docker logs -f mongodb
@@ -678,7 +677,7 @@ Error: connect ECONNREFUSED 127.0.0.1:27017
 ```
 Solution: Start MongoDB container
 ```bash
-docker-compose up -d mongodb
+cd {baseDir} && docker-compose up -d mongodb
 ```
 
 **Error: Authentication failed**
