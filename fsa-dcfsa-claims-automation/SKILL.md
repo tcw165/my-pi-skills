@@ -21,7 +21,9 @@ Ensure these services are running:
 - **Qdrant**
 - **pdftotext** (PDF-to-text converter)
 
-See your `docker-compose.yml` for service configuration and `docker ps` to verify they're running.
+```bash
+cd {baseDir} && docker-compose up -d mongodb qdrant ollama
+```
 
 ## Install pdftotext
 
