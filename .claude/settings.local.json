@@ -6,7 +6,11 @@
       "Write(*)",
       "Read(*)",
       "Glob(*)",
-      "Grep(*)"
+      "Grep(*)",
+      "WebSearch",
+      "WebFetch(*)",
+      "Skill(update-config)"
     ]
-  }
+  },
+  "prefersReducedMotion": true
 }
