@@ -11,7 +11,9 @@ Manage vector collections in Qdrant: create collections, add/update vectors with
 
 - **Qdrant** on `http://localhost:6333`
 - **Ollama** on `http://localhost:11434` (for generating embeddings)
-- Running: `docker-compose up -d qdrant ollama`
+```bash
+cd {baseDir} && docker-compose up -d qdrant ollama
+```
 
 ## Create Collection
 
