@@ -11,8 +11,7 @@ Automate the monthly FSA/DCFSA claim workflow: ingest credit card bills, cross-r
 
 This skill uses three local services to enable a repeatable monthly workflow:
 1. **Ingest** credit card statements (PDF → TXT → MongoDB)
-2. **Reference** FSA/DCFSA eligibility rules from Qdrant vector store
-3. **Scan** transaction items and flag eligible claims
+2. **Fetch & score** — query Qdrant eligibility rules and pipe into transaction scoring
 
 ## Prerequisites
 
@@ -92,59 +91,50 @@ Convert PDF credit card statements to text and load transactions into MongoDB.
 
 ---
 
-### Step 2: Read FSA/DCFSA Eligibility Rules from Qdrant
+### Step 2: Fetch Eligibility Rules and Score Transactions
 
-Retrieve FSA/DCFSA eligibility knowledge from Qdrant vector database.
+Query Qdrant for FSA/DCFSA eligibility rules and pipe them directly into `score-transactions.ts`.
 
-**Input:** Qdrant collections with eligibility documentation
+**Input:** Qdrant eligibility collections + transactions from MongoDB
 
-**Process:**
-1. Connect to Qdrant
-2. Query eligibility collections:
-   - FSA-eligible items and categories
-   - DCFSA-eligible items and categories
-   - Ineligible patterns and rules
-3. Build searchable index of eligibility rules
-4. Cache locally for quick reference
+```bash
+cd {baseDir}/fsa-dcfsa-claims-automation/scripts
 
-**Output:** Eligibility rules indexed and cached
+# Pipe eligibility rules from Qdrant directly into scoring (strongly recommended)
+{baseDir}/vector-search/scripts/qdrant-cli --search "FSA DCFSA eligibility" \
+  | npx tsx score-transactions.ts --date-from 2026-02-01 --date-to 2026-02-28
 
----
+# Or save rules to a file first, then score
+{baseDir}/vector-search/scripts/qdrant-cli --search "FSA DCFSA eligible items and categories" --limit 20 \
+  > /tmp/fsa-rules.txt
+npx tsx score-transactions.ts \
+  --rules-file /tmp/fsa-rules.txt \
+  --date-from 2026-02-01 --date-to 2026-02-28
 
-### Step 3: Scan MongoDB Transactions and Identify Eligible Items
+# Dry run (compute scores but don't write to MongoDB)
+npx tsx score-transactions.ts --rules-file /tmp/fsa-rules.txt --rescore --dry-run
 
-Cross-reference transactions against eligibility rules and score them.
+# Force re-score already-scored transactions
+npx tsx score-transactions.ts --rules-file /tmp/fsa-rules.txt --rescore
+```
 
-**Input:** Transactions from MongoDB + eligibility rules from Qdrant
+`qdrant-cli` lives in the **vector-search** skill (`vector-search/scripts/qdrant-cli`).
+Override service URLs via env vars if needed:
+- `OLLAMA_URL` (default: `http://localhost:11434`)
+- `QDRANT_URL` (default: `http://localhost:6333`)
 
-**Process:**
-1. **Load transactions from MongoDB:** Query transactions for the target month using the CLI:
+`score-transactions.ts`:
+- Fetches unscored transactions from MongoDB (skips already-scored unless `--rescore`)
+- Spawns a `pi` subprocess in RPC mode as the scoring engine
+- Writes `eligible_fsa`, `eligible_dcfsa`, confidence scores, and `eligibility_reason` back to MongoDB
+- Prints progress to stderr; outputs a YAML summary report to stdout
 
-   ```bash
-   cd {baseDir}/fsa-dcfsa-claims-automation/scripts
-   npx tsx ingest-transaction-cli.ts --query-transaction '{"date_from":"2025-02-01","date_to":"2025-02-28"}'
-   ```
+To verify results after scoring:
+```bash
+npx tsx ingest-transaction-cli.ts --query-transaction '{"date_from":"2026-02-01","eligible_fsa":true}'
+```
 
-   To see all available query parameters:
-   ```bash
-   npx tsx ingest-transaction-cli.ts --query-schema
-   ```
-
-2. **Load eligibility rules from Qdrant:** Query Qdrant collections for FSA, DCFSA, and ineligible eligibility patterns and rules
-3. For each transaction:
-   - Extract key terms (merchant name, description, category)
-   - Match against FSA eligibility rules → compute `eligible_fsa_confidence` score
-   - Match against DCFSA eligibility rules → compute `eligible_dcfsa_confidence` score
-   - Determine final eligibility status and set `eligible_fsa` and `eligible_dcfsa` booleans
-   - Set `eligibility_reason` (human-readable summary)
-4. **Update MongoDB with eligibility results** using `--upsert-transaction` for each transaction:
-   ```bash
-   npx tsx ingest-transaction-cli.ts --upsert-transaction \
-     '{"id":"<id>","eligible_fsa":true,"eligible_dcfsa":false,"eligible_fsa_confidence":0.95,"eligible_dcfsa_confidence":0.1,"eligibility_reason":"Pharmacy purchase","eligibility_scored_at":"2025-03-01T00:00:00Z"}'
-   ```
-5. Generate eligibility report (summary of results by category and status)
-
-**Output:** Updated transactions in MongoDB with populated eligibility fields, summary report
+**Output:** Updated transactions in MongoDB with populated eligibility fields, YAML summary to stdout
 
 ---
 
@@ -152,10 +142,9 @@ Cross-reference transactions against eligibility rules and score them.
 
 1. Organize credit card statements in monthly folder
 2. Run Step 1: Ingest statements
-3. Run Step 2: Load eligibility rules (once per month or as needed)
-4. Run Step 3: Scan and score transactions
-5. Review manual items
-6. Submit claims via Forma
+3. Run Step 2: Fetch eligibility rules and score transactions
+4. Review manual items
+5. Submit claims via Forma
 
 ---
 
