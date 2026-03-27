@@ -1,0 +1,9 @@
+#!/bin/sh
+# qdrant-cli — thin shell wrapper so callers can run `qdrant-cli` without
+# knowing the underlying npx/tsx invocation.
+#
+# Usage:
+#   qdrant-cli --search "FSA DCFSA eligibility rules"
+#   qdrant-cli --search "FSA eligible items" --collection forma_help_center --limit 5
+#   qdrant-cli --search "FSA DCFSA eligibility" | npx tsx score-transactions.ts --dry-run
+exec npx tsx "$(dirname "$0")/qdrant-cli.ts" "$@"
