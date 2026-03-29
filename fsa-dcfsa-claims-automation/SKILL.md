@@ -45,7 +45,11 @@ cd {baseDir}/fsa-dcfsa-claims-automation/scripts
 npm install
 ```
 
-⚠️ **Important:** No new scripts should be created in the `scripts/` folder during the workflow. Use only the existing CLI tools: `ingest-transaction-cli.ts` and `score-transactions.ts`. All workflow steps must use these existing scripts and tools.
+⚠️ **Important:** Do **not** write any new scripts or code files anywhere (including `/tmp/` or any other location) to work around this workflow. The only permitted tools for data ingestion and scoring are:
+- `ingest-transaction-cli.ts` — for all MongoDB writes
+- `score-transactions.ts` — for all eligibility scoring
+
+Direct MongoDB access (e.g. `mongosh`, driver code, or any ad-hoc script) is also forbidden. Every transaction must go through the CLI tools above.
 
 ---
 
@@ -102,7 +106,7 @@ Show the user the extracted JSON for review and ask for confirmation before proc
 
 #### 1c. Store transactions via the ingestion CLI
 
-⚠️ **Do not insert transactions any other way.** Always use `ingest-transaction-cli.ts`.
+⚠️ **Do not insert transactions any other way — not via `mongosh`, not via a helper script in `/tmp/` or anywhere else.** The only permitted insertion method is `ingest-transaction-cli.ts --import-file`.
 
 After user confirms the extracted JSON, import the whole file in one command:
 
