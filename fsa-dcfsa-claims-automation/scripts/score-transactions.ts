@@ -207,6 +207,7 @@ if (require.main === module) {
     }
     info(`Rules loaded (${rulesText.length} chars)`);
     const concurrency = Math.max(1, parseInt(opts.concurrency, 10) || 10);
+    const startTime = Date.now();
     info(`Concurrency: ${concurrency}`);
 
     // -- Connect to MongoDB --------------------------------------------------
@@ -310,8 +311,12 @@ if (require.main === module) {
       await dbClient.close();
     }
 
+    const elapsedMs = Date.now() - startTime;
+    const elapsedSec = (elapsedMs / 1000).toFixed(1);
+    info(`Done in ${elapsedSec}s (${summary.scored} scored, concurrency=${concurrency})`);
+
     // -- Output YAML summary to stdout ---------------------------------------
-    process.stdout.write(toYaml(summary));
+    process.stdout.write(toYaml({ ...summary, elapsed_ms: elapsedMs }));
 
     if (summary.errors.length > 0) {
       process.exit(1);
