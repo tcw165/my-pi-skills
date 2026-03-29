@@ -88,6 +88,8 @@ Each element must follow this schema (omit eligibility fields — the CLI sets t
     "source_file": "/absolute/path/to/statement.pdf"
   }
 ]
+
+// `imported_at` is optional — defaults to the current timestamp on insert.
 ```
 
 Rules for extraction:
@@ -102,16 +104,14 @@ Show the user the extracted JSON for review and ask for confirmation before proc
 
 ⚠️ **Do not insert transactions any other way.** Always use `ingest-transaction-cli.ts`.
 
-After user confirms the extracted JSON, loop over the array and insert each transaction:
+After user confirms the extracted JSON, import the whole file in one command:
 
 ```bash
 cd {baseDir}/fsa-dcfsa-claims-automation/scripts
-
-# Insert each transaction from the JSON file one by one
-jq -c '.[]' /tmp/transactions-YYYY-MM.json | while IFS= read -r tx; do
-  npx tsx ingest-transaction-cli.ts --insert-transaction "$tx"
-done
+npx tsx ingest-transaction-cli.ts --import-file /tmp/transactions-YYYY-MM.json
 ```
+
+Duplicates are detected and skipped automatically. A summary line is printed on completion.
 
 To correct a previously inserted transaction, use `--upsert-transaction` with its `id`:
 ```bash

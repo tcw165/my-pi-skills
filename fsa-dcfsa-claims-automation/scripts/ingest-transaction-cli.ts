@@ -47,6 +47,12 @@
  *   Example:
  *     '{"date_from":"2025-02-01","date_to":"2025-02-28","eligible_fsa":true}'
  *
+ * --import-file <path>
+ *   Import a JSON array of transactions from a file. Each element must match
+ *   NewTransactionInput. Duplicates are skipped; a summary is printed on exit.
+ *   Example:
+ *     npx tsx ingest-transaction-cli.ts --import-file /tmp/transactions-2026-02.json
+ *
  * --query-schema
  *   Prints available query parameters for --query-transaction and exits.
  *   No database connection required.
@@ -56,9 +62,11 @@ import { Command } from "commander";
 import { MongoClient } from "mongodb";
 import { stringify as toYaml } from "yaml";
 import chalk from "chalk";
+import { readFileSync } from "fs";
 import { MONGO_URI, DB_NAME, COLLECTION_NAME } from "./consts.js";
 import {
   insertTransaction,
+  insertTransactions,
   upsertTransaction,
   deleteTransaction,
   dropCollectionIfExists,
@@ -99,11 +107,13 @@ if (require.main === module) {
     .option("--drop-table", "Drop the entire credit_card_statements collection")
     .option("--transaction-schema", "Print the CreditCardTransaction JSON Schema and exit")
     .option("--query-transaction <json>", "Query transactions (see --query-schema for fields)")
+    .option("--import-file <path>", "Import a JSON array of transactions from a file")
     .option("--query-schema", "Print available query parameters for --query-transaction and exit");
 
   program.parse(process.argv);
   const opts = program.opts<{
     insertTransaction?: string;
+    importFile?: string;
     upsertTransaction?: string;
     deleteTransaction?: string;
     dropTable?: boolean;
@@ -125,6 +135,7 @@ if (require.main === module) {
 
   const provided = [
     opts.insertTransaction,
+    opts.importFile,
     opts.upsertTransaction,
     opts.deleteTransaction,
     opts.dropTable,
@@ -150,6 +161,23 @@ if (require.main === module) {
           ok(`Inserted: ${doc._id.toString()}`);
         } else {
           warn(`Duplicate skipped: ${doc._id.toString()}`);
+        }
+      }
+
+      // -- import-file ---------------------------------------------------------
+      if (opts.importFile !== undefined) {
+        const raw = JSON.parse(readFileSync(opts.importFile, "utf-8")) as unknown;
+        if (!Array.isArray(raw)) {
+          console.error(chalk.red("[error]"), "--import-file expects a JSON array");
+          process.exit(1);
+        }
+        const { inserted, skipped, errors } = await insertTransactions(db, raw as Record<string, unknown>[]);
+        ok(`Imported: ${inserted} inserted, ${skipped} duplicate(s) skipped`);
+        if (errors.length > 0) {
+          for (const { index, message } of errors) {
+            console.error(chalk.red("[error]"), `  [${index}] ${message}`);
+          }
+          process.exit(1);
         }
       }
 

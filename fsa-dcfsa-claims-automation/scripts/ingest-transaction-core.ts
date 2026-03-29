@@ -259,6 +259,7 @@ export async function insertTransaction(
   raw: Record<string, unknown>,
 ): Promise<InsertTransactionResult> {
   await setupDb(db);
+  if (raw.imported_at === undefined) raw.imported_at = new Date();
   coerceDates(raw);
   coerceAmount(raw);
 
@@ -273,6 +274,31 @@ export async function insertTransaction(
 
   const doc = await CreditCardTransaction.insert(db, raw as NewTransactionInput);
   return { doc, inserted: true };
+}
+
+export interface InsertTransactionsResult {
+  inserted: number;
+  skipped: number;
+  errors: Array<{ index: number; message: string }>;
+}
+
+export async function insertTransactions(
+  db: Db,
+  records: Record<string, unknown>[],
+): Promise<InsertTransactionsResult> {
+  const result: InsertTransactionsResult = { inserted: 0, skipped: 0, errors: [] };
+
+  for (let i = 0; i < records.length; i++) {
+    try {
+      const { inserted } = await insertTransaction(db, records[i]);
+      if (inserted) result.inserted++;
+      else result.skipped++;
+    } catch (e) {
+      result.errors.push({ index: i, message: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
+  return result;
 }
 
 export interface UpsertTransactionResult {
