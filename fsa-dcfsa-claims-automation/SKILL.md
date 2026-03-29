@@ -62,30 +62,66 @@ Convert PDF credit card statements to text and load transactions into MongoDB.
 - The statement covers transactions from early February through early March
 
 **Process:**
+
+#### 1a. Prepare files
 1. Ensure ingestion folder exists at `~/Downloads/FSA_DCFSA_Bills/YYYY-MM/` (create if missing)
 2. Prompt user to place all credit card bill PDFs in the folder
 3. Wait for user confirmation that files are ready
 4. Convert each PDF to text using the PDF-to-text skill
-5. Extract transaction data from text (date, merchant, amount, description)
-6. Normalize merchant names and assign transaction categories
-7. Store each transaction in MongoDB using the ingestion CLI:
 
-   ```bash
-   cd {baseDir}/fsa-dcfsa-claims-automation/scripts
-   npx tsx ingest-transaction-cli.ts --insert-transaction '<json>'
-   ```
+#### 1b. Extract transactions to a JSON file
 
-   To see the full field schema before inserting, run:
-   ```bash
-   npx tsx ingest-transaction-cli.ts --transaction-schema
-   ```
+Parse the raw text and extract **all** transactions into a JSON array. Save it to a temporary file (e.g. `/tmp/transactions-YYYY-MM.json`) **before** touching the database. Do not store transactions directly — this file is the source of truth for the import.
 
-   Eligibility fields (`eligible_fsa`, `eligible_dcfsa`, etc.) are set to `null` automatically and populated in Step 3.
+Each element must follow this schema (omit eligibility fields — the CLI sets them to `null`):
 
-   To correct a previously inserted transaction, use `--upsert-transaction` with the document's `id`:
-   ```bash
-   npx tsx ingest-transaction-cli.ts --upsert-transaction '{"id":"<id>","amount":99.99}'
-   ```
+```json
+[
+  {
+    "date": "YYYY-MM-DD",
+    "merchant": "NORMALIZED UPPERCASE NAME",
+    "amount": 12.34,
+    "description": "Human-readable description of the charge",
+    "category": "medical | pharmacy | food | retail | transport | entertainment | other",
+    "issuer": "Chase | Amex | Citi | ...",
+    "card_last_four": "1234",
+    "source_file": "/absolute/path/to/statement.pdf"
+  }
+]
+```
+
+Rules for extraction:
+- `merchant` — uppercase, strip noise (e.g. `"SQ *PHARMACY"` → `"PHARMACY"`)
+- `amount` — positive for charges, negative for credits/refunds
+- `category` — assign the broadest accurate category from the list above
+- Include every transaction line, including refunds and credits
+
+Show the user the extracted JSON for review and ask for confirmation before proceeding to 1c.
+
+#### 1c. Store transactions via the ingestion CLI
+
+⚠️ **Do not insert transactions any other way.** Always use `ingest-transaction-cli.ts`.
+
+After user confirms the extracted JSON, loop over the array and insert each transaction:
+
+```bash
+cd {baseDir}/fsa-dcfsa-claims-automation/scripts
+
+# Insert each transaction from the JSON file one by one
+jq -c '.[]' /tmp/transactions-YYYY-MM.json | while IFS= read -r tx; do
+  npx tsx ingest-transaction-cli.ts --insert-transaction "$tx"
+done
+```
+
+To correct a previously inserted transaction, use `--upsert-transaction` with its `id`:
+```bash
+npx tsx ingest-transaction-cli.ts --upsert-transaction '{"id":"<id>","amount":99.99}'
+```
+
+To inspect the full schema at any time:
+```bash
+npx tsx ingest-transaction-cli.ts --transaction-schema
+```
 
 **Output:** Transactions stored in MongoDB (one document per transaction), ready for eligibility scanning
 
