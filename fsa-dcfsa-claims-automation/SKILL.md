@@ -57,9 +57,9 @@ Convert PDF credit card statements to text and load transactions into MongoDB.
 
 **Input:** Credit card statement PDFs
 
-**Note:** Credit card statements are typically issued after the 18th of the month. When requesting "this month's" statement, you're usually referring to the previous calendar month's transactions. For example:
-- In March, you'd ingest February's statement
-- The statement covers transactions from early February through early March
+**Note:** Credit card statements close around the end of the prior month and are typically available by the 15th. Use the 15th as the threshold to determine which statement to ingest:
+- Before the 15th → ingest last month's statement (e.g. on March 10, ingest Feb's statement)
+- On or after the 15th → ingest this month's statement (e.g. on March 20, ingest March's statement)
 
 **Process:**
 
