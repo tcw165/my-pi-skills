@@ -123,11 +123,7 @@ Override service URLs via env vars if needed:
 - `OLLAMA_URL` (default: `http://localhost:11434`)
 - `QDRANT_URL` (default: `http://localhost:6333`)
 
-`score-transactions.ts`:
-- Fetches unscored transactions from MongoDB (skips already-scored unless `--rescore`)
-- Spawns a `pi` subprocess in RPC mode as the scoring engine
-- Writes `eligible_fsa`, `eligible_dcfsa`, confidence scores, and `eligibility_reason` back to MongoDB
-- Prints progress to stderr; outputs a YAML summary report to stdout
+Run `npx tsx score-transactions.ts --help` for the full list of options.
 
 To verify results after scoring:
 ```bash
