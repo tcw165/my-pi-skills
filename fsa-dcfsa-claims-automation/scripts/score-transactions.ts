@@ -184,7 +184,8 @@ if (require.main === module) {
       "Re-score already-scored transactions (default: skip)",
       false,
     )
-    .option("--dry-run", "Compute scores but do not write to MongoDB", false);
+    .option("--dry-run", "Compute scores but do not write to MongoDB", false)
+    .option("--concurrency <n>", "Max parallel pi subprocesses", "20");
 
   program.parse(process.argv);
   const opts = program.opts<{
@@ -193,6 +194,7 @@ if (require.main === module) {
     dateTo?: string;
     rescore: boolean;
     dryRun: boolean;
+    concurrency: string;
   }>();
 
   async function main() {
@@ -204,6 +206,8 @@ if (require.main === module) {
       process.exit(1);
     }
     info(`Rules loaded (${rulesText.length} chars)`);
+    const concurrency = Math.max(1, parseInt(opts.concurrency, 10) || 10);
+    info(`Concurrency: ${concurrency}`);
 
     // -- Connect to MongoDB --------------------------------------------------
     const dbClient = new MongoClient(MONGO_URI);
@@ -246,8 +250,8 @@ if (require.main === module) {
         warn("Nothing to score. Use --rescore to re-score existing results.");
       }
 
-      // -- Score each transaction --------------------------------------------
-      for (const doc of toScore) {
+      // -- Score transactions with bounded concurrency ----------------------
+      async function scoreOne(doc: (typeof toScore)[number]) {
         const id = doc._id.toString();
         const txData = {
           date: doc.date,
@@ -262,7 +266,8 @@ if (require.main === module) {
           const score = parseScore(raw);
 
           const eligible_fsa = score.fsa_confidence >= ELIGIBILITY_THRESHOLD;
-          const eligible_dcfsa = score.dcfsa_confidence >= ELIGIBILITY_THRESHOLD;
+          const eligible_dcfsa =
+            score.dcfsa_confidence >= ELIGIBILITY_THRESHOLD;
 
           info(
             `${doc.merchant.padEnd(30)} FSA=${String(eligible_fsa).padEnd(5)} ` +
@@ -291,6 +296,16 @@ if (require.main === module) {
           summary.errors.push({ id, merchant: doc.merchant, message });
         }
       }
+
+      // Run up to `concurrency` tasks at a time
+      const queue = [...toScore];
+      async function worker() {
+        while (queue.length > 0) {
+          const doc = queue.shift()!;
+          await scoreOne(doc);
+        }
+      }
+      await Promise.all(Array.from({ length: concurrency }, worker));
     } finally {
       await dbClient.close();
     }
