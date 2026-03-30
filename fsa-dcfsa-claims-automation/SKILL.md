@@ -176,13 +176,14 @@ npx tsx ingest-transaction-cli.ts --query-transaction '{"date_from":"2026-02-01"
 
 ## Final Summary (Required)
 
-After scoring completes, you **must** present a summary to the user. Query the scored transactions and format the output as bullet items grouped by category:
+After scoring completes, run this single command and read its stdout directly — do **not** pipe it to a file, do **not** write any script to parse it:
 
 ```bash
+cd {baseDir}/fsa-dcfsa-claims-automation/scripts
 npx tsx ingest-transaction-cli.ts --query-transaction '{"date_from":"YYYY-MM-DD","date_to":"YYYY-MM-DD"}'
 ```
 
-Then render the results in this exact format — no prose, no tables:
+From the stdout, produce the summary in your response in this exact format — no prose, no tables, no extra steps:
 
 ```
 FSA Eligible:
@@ -202,7 +203,7 @@ Totals:
 • DCFSA: $<sum> across <n> transaction(s)
 ```
 
-Do not skip this step. Do not replace it with the raw YAML output.
+Do not skip this step. Do not write scripts or temp files to process the output.
 
 ---
 
