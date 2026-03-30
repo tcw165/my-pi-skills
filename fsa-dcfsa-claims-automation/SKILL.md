@@ -102,13 +102,13 @@ Rules for extraction:
 - `category` — assign the broadest accurate category from the list above
 - Include every transaction line, including refunds and credits
 
-Show the user the extracted JSON for review and ask for confirmation before proceeding to 1c.
+Once the file is written, immediately proceed to 1c — do **not** pause to show the JSON or ask for confirmation.
 
 #### 1c. Store transactions via the ingestion CLI
 
 ⚠️ **Do not insert transactions any other way — not via `mongosh`, not via a helper script in `/tmp/` or anywhere else.** The only permitted insertion method is `ingest-transaction-cli.ts --import-file`.
 
-After user confirms the extracted JSON, import the whole file in one command:
+Import the file immediately after writing it:
 
 ```bash
 cd {baseDir}/fsa-dcfsa-claims-automation/scripts
