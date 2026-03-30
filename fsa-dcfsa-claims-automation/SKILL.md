@@ -170,17 +170,37 @@ To verify results after scoring:
 npx tsx ingest-transaction-cli.ts --query-transaction '{"date_from":"2026-02-01","eligible_fsa":true}'
 ```
 
-**Output:** Updated transactions in MongoDB with populated eligibility fields, YAML summary to stdout
-
 ---
 
-## Monthly Workflow
+## Final Summary (Required)
 
-1. Organize credit card statements in monthly folder
-2. Run Step 1: Ingest statements
-3. Run Step 2: Fetch eligibility rules and score transactions
-4. Review manual items
-5. Submit claims via Forma
+After scoring completes, you **must** present a summary to the user. Query the scored transactions and format the output as bullet items grouped by category:
+
+```bash
+npx tsx ingest-transaction-cli.ts --query-transaction '{"date_from":"YYYY-MM-DD","date_to":"YYYY-MM-DD"}'
+```
+
+Then render the results in this exact format — no prose, no tables:
+
+```
+FSA Eligible:
+• <MERCHANT> — $<amount> (<date>) — <eligibility_reason>
+• ...
+
+DCFSA Eligible:
+• <MERCHANT> — $<amount> (<date>) — <eligibility_reason>
+• ...
+
+Not Eligible:
+• <MERCHANT> — $<amount> (<date>)
+• ...
+
+Totals:
+• FSA: $<sum> across <n> transaction(s)
+• DCFSA: $<sum> across <n> transaction(s)
+```
+
+Do not skip this step. Do not replace it with the raw YAML output.
 
 ---
 
