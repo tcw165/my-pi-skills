@@ -108,12 +108,14 @@ if (require.main === module) {
     .option("--transaction-schema", "Print the CreditCardTransaction JSON Schema and exit")
     .option("--query-transaction <json>", "Query transactions (see --query-schema for fields)")
     .option("--import-file <path>", "Import a JSON array of transactions from a file")
+    .option("--source-file <path>", "Source PDF path to stamp on every record in --import-file (overrides source_file in JSON)")
     .option("--query-schema", "Print available query parameters for --query-transaction and exit");
 
   program.parse(process.argv);
   const opts = program.opts<{
     insertTransaction?: string;
     importFile?: string;
+    sourceFile?: string;
     upsertTransaction?: string;
     deleteTransaction?: string;
     dropTable?: boolean;
@@ -147,6 +149,11 @@ if (require.main === module) {
     program.help();
   }
 
+  if (opts.importFile !== undefined && opts.sourceFile === undefined) {
+    console.error(chalk.red("[error]"), "Missing required --source-file <path>");
+    process.exit(1);
+  }
+
   async function main() {
     const client = new MongoClient(MONGO_URI);
 
@@ -171,7 +178,9 @@ if (require.main === module) {
           console.error(chalk.red("[error]"), "--import-file expects a JSON array");
           process.exit(1);
         }
-        const { inserted, skipped, errors } = await insertTransactions(db, raw as Record<string, unknown>[]);
+        const records = raw as Record<string, unknown>[];
+        for (const r of records) r.source_file = opts.sourceFile;
+        const { inserted, skipped, errors } = await insertTransactions(db, records);
         ok(`Imported: ${inserted} inserted, ${skipped} duplicate(s) skipped`);
         if (errors.length > 0) {
           for (const { index, message } of errors) {

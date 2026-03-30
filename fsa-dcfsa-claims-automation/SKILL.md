@@ -88,12 +88,12 @@ Each element must follow this schema (omit eligibility fields — the CLI sets t
     "description": "Human-readable description of the charge",
     "category": "medical | pharmacy | food | retail | transport | entertainment | other",
     "issuer": "Chase | Amex | Citi | ...",
-    "card_last_four": "1234",
-    "source_file": "/absolute/path/to/statement.pdf"
+    "card_last_four": "1234"
   }
 ]
 
 // `imported_at` is optional — defaults to the current timestamp on insert.
+// `source_file` is supplied via --source-file on the import command, not in the JSON.
 ```
 
 Rules for extraction:
@@ -112,7 +112,9 @@ Import the file immediately after writing it:
 
 ```bash
 cd {baseDir}/fsa-dcfsa-claims-automation/scripts
-npx tsx ingest-transaction-cli.ts --import-file /tmp/transactions-YYYY-MM.json
+npx tsx ingest-transaction-cli.ts \
+  --import-file /tmp/transactions-YYYY-MM.json \
+  --source-file /absolute/path/to/statement.pdf
 ```
 
 Duplicates are detected and skipped automatically. A summary line is printed on completion.
