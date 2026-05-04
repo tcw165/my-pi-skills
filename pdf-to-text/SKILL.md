@@ -184,6 +184,7 @@ fi
 
 ## Related Skills
 
+- **pdf-to-png** - Same Poppler package; use when you need per-page images instead of text
 - **fsa-dcfsa-claims-automation** - Uses this skill for statement ingestion
 - **mongodb-local** - Store converted text data
 
