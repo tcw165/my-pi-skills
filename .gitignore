@@ -23,6 +23,11 @@ build/
 *.tsbuildinfo
 out/
 
+# Bazel
+bazel-*
+.bazel-cache/
+MODULE.bazel.lock
+
 # Logs
 logs/
 *.log
