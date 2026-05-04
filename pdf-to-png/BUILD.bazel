@@ -1,0 +1,37 @@
+load("@aspect_rules_js//js:defs.bzl", "js_test")
+load("@aspect_rules_ts//ts:defs.bzl", "ts_config", "ts_project")
+
+ts_config(
+    name = "tsconfig",
+    src = "tsconfig.json",
+    deps = ["//:tsconfig"],
+)
+
+ts_project(
+    name = "pdf-to-png-test-lib",
+    srcs = ["pdf-to-png.test.ts"],
+    declaration = False,
+    resolve_json_module = True,
+    transpiler = "tsc",
+    tsconfig = ":tsconfig",
+    deps = ["//:node_modules/@types/node"],
+)
+
+# Run with: bazel test //pdf-to-png:pdf-to-png-test
+# (HOME/PATH/ANTHROPIC_API_KEY are inherited via .bazelrc.)
+# Hits the live Anthropic API (billable) and the user's ~/.claude credentials.
+js_test(
+    name = "pdf-to-png-test",
+    chdir = package_name(),
+    data = [
+        ":pdf-to-png-test-lib",
+        "//pdf-to-png/testdata:sample_pdf",
+    ],
+    entry_point = "pdf-to-png.test.js",
+    tags = [
+        "external",
+        "manual",
+        "no-sandbox",
+        "requires-network",
+    ],
+)

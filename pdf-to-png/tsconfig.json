@@ -1,0 +1,4 @@
+{
+  "extends": "../tsconfig.json",
+  "files": ["pdf-to-png.test.ts"]
+}
