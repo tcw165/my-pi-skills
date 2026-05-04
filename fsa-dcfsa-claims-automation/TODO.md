@@ -164,3 +164,17 @@ P0.3 only sees Forma's web UI, which lags the actual reimbursement by days. The 
 - [ ] Also catch `denied` / `more info needed` emails → drive `→ rejected` / `→ needs_info` states
 
 **Conflict resolution**: if multiple signals fire (email + deposit + page), use first-arriving as the transition trigger and stamp all observed sources for audit.
+
+### P2.5 Skill tests in GitHub Actions (Linux)
+
+Run `bazel test //pdf-to-png:pdf-to-png-test` (and future skill tests) on every PR via a Linux GitHub Action. Today the test only runs locally because it spawns the headless `claude` CLI and depends on `~/.claude/` — neither exists on a fresh runner. Provides a regression guard for `pdf-to-png` (consumed by P1.1's receipt image generation) and a template for testing sibling skills.
+
+**Known blocker from first attempt**: `@anthropic-ai/claude-agent-sdk` is ESM-only, but the repo's bazel `ts_project` setup emits CommonJS by default. Adding `pdf-to-png/package.json` with `"type": "module"` (and surfacing it as a `ts_project` `data` dep so tsc sees it in the sandbox) is the likely fix — needs a focused retry, not just a tag flip.
+
+**Action items**:
+- [ ] Resolve the ESM/CJS conflict above so a `ts_project` in `pdf-to-png/` can `import { query } from "@anthropic-ai/claude-agent-sdk"`.
+- [ ] Swap `spawnSync("claude", ...)` in `pdf-to-png/pdf-to-png.test.ts` for `query()`; stage `SKILL.md` into a `<tmpdir>/.claude/skills/pdf-to-png/SKILL.md` for project-mode skill discovery (`settingSources: ["project"]`, `allowedTools: ["Skill", "Bash"]`, `permissionMode: "bypassPermissions"` + `allowDangerouslySkipPermissions: true`).
+- [ ] Drop the `manual` tag from `//pdf-to-png:pdf-to-png-test` so `bazel test //...` includes it.
+- [ ] Add `.github/workflows/bazel-test.yml`: checkout → `bazel-contrib/setup-bazel` → `apt-get install -y poppler-utils` → `bazel test //...` with `ANTHROPIC_API_KEY` from `secrets.ANTHROPIC_API_KEY`.
+- [ ] Set `ANTHROPIC_API_KEY` as a GitHub Actions repository secret (out-of-band; one-time).
+- [ ] Pin a model that's cheap enough for per-PR cost (e.g. `claude-haiku-4-5-20251001`) in the test invocation.
