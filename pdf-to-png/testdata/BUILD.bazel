@@ -1,0 +1,12 @@
+load("@aspect_bazel_lib//lib:copy_to_bin.bzl", "copy_to_bin")
+
+# js_test targets require runtime data to live in bazel-bin (not as source
+# files), so we wrap the fixture in copy_to_bin. The label `:sample_pdf`
+# (underscore, not dot) is what downstream targets depend on.
+copy_to_bin(
+    name = "sample_pdf",
+    srcs = ["sample.pdf"],
+    visibility = ["//pdf-to-png:__pkg__"],
+)
+
+exports_files(["sample.pdf"])
