@@ -1,0 +1,14 @@
+build --incompatible_strict_action_env
+test --test_output=errors
+
+# Skill e2e tests shell out to user-installed CLIs (`claude`, `pdftoppm`, ...) and
+# read user credentials from $HOME/.claude/. Inherit these env vars by default so
+# `bazel test //...` works without per-invocation `--test_env` flags.
+test --test_env=HOME
+test --test_env=PATH
+test --test_env=ANTHROPIC_API_KEY
+
+# aspect_rules_ts requires choosing a skipLibCheck mode globally.
+# `honor_tsconfig` defers to each tsconfig.json's setting (we set
+# `skipLibCheck: true` in the root tsconfig.json).
+common --@aspect_rules_ts//ts:skipLibCheck=honor_tsconfig
